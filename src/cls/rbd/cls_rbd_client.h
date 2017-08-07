@@ -191,6 +191,10 @@ namespace librbd {
                              const std::string &start, uint64_t max_return);
     int metadata_list_finish(bufferlist::iterator *it,
                              std::map<std::string, bufferlist> *pairs);
+    void get_image_qos_start(librados::ObjectReadOperation *op,
+			     const std::string &start, uint64_t max_return);
+    int get_image_qos_finish(bufferlist::iterator *it,
+			     std::map<std::string, uint64_t> *qos_pairs);
     void metadata_set(librados::ObjectWriteOperation *op,
                       const map<std::string, bufferlist> &data);
     int metadata_set(librados::IoCtx *ioctx, const std::string &oid,

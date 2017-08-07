@@ -8,6 +8,7 @@
 #include "include/int_types.h"
 #include "include/buffer.h"
 #include "include/encoding.h"
+#include "include/rbd/librbd.h"
 #include "include/types.h"
 #include "include/utime.h"
 #include <iosfwd>
@@ -45,6 +46,7 @@ enum EventType {
   EVENT_TYPE_METADATA_REMOVE       = 17,
   EVENT_TYPE_AIO_WRITESAME         = 18,
   EVENT_TYPE_AIO_COMPARE_AND_WRITE = 19,
+  EVENT_TYPE_QOS_SET		   = 20,
 };
 
 struct AioDiscardEvent {
@@ -399,6 +401,24 @@ struct MetadataRemoveEvent : public OpEventBase {
   void dump(Formatter *f) const;
 };
 
+struct QosSetEvent : public OpEventBase {
+  static const EventType TYPE = EVENT_TYPE_QOS_SET;
+  rbd_image_qos_type_t qos_type;
+  rbd_image_qos_key_t qos_key;
+  uint64_t qos_val;
+
+  QosSetEvent() {
+  }
+  QosSetEvent(uint64_t op_tid, rbd_image_qos_type_t _qos_type,
+	      rbd_image_qos_key_t _qos_key, const uint64_t _qos_val)
+    : OpEventBase(op_tid), qos_type(_qos_type), qos_key(_qos_key), qos_val(_qos_val) {
+  }
+
+  void encode(bufferlist& bl) const;
+  void decode(__u8 version, bufferlist::iterator& it);
+  void dump(Formatter *f) const;
+};
+
 struct UnknownEvent {
   static const EventType TYPE = static_cast<EventType>(-1);
 
@@ -427,6 +447,7 @@ typedef boost::mpl::vector<AioDiscardEvent,
                            MetadataRemoveEvent,
                            AioWriteSameEvent,
                            AioCompareAndWriteEvent,
+			   QosSetEvent,
                            UnknownEvent> EventVector;
 typedef boost::make_variant_over<EventVector>::type Event;
 

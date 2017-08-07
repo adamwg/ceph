@@ -12,6 +12,7 @@
 #include "librbd/ObjectMap.h"
 #include "librbd/Utils.h"
 #include "librbd/image/RefreshParentRequest.h"
+#include "librbd/internal.h"
 #include "librbd/io/ImageRequestWQ.h"
 #include "librbd/journal/Policy.h"
 
@@ -283,6 +284,43 @@ Context *RefreshRequest<I>::handle_v2_get_mutable_metadata(int *result) {
     ldout(cct, 5) << "ignoring dynamically disabled exclusive lock" << dendl;
     m_features |= RBD_FEATURE_EXCLUSIVE_LOCK;
     m_incomplete_update = true;
+  }
+
+  send_v2_get_qos();
+  return nullptr;
+}
+
+template <typename I>
+void RefreshRequest<I>::send_v2_get_qos() {
+  CephContext *cct = m_image_ctx.cct;
+  ldout(cct, 10) << this << " " << __func__ << dendl;
+
+  librados::ObjectReadOperation op;
+  cls_client::get_image_qos_start(&op, RBD_IMAGE_QOS_PREFIX, 0);
+
+  using klass = RefreshRequest<I>;
+  librados::AioCompletion *comp =
+    create_rados_callback<klass, &klass::handle_v2_get_qos>(this);
+  m_out_bl.clear();
+  m_image_ctx.md_ctx.aio_operate(m_image_ctx.header_oid,
+			      comp, &op, &m_out_bl);
+  comp->release();
+}
+
+template <typename I>
+Context *RefreshRequest<I>::handle_v2_get_qos(int *result) {
+  CephContext *cct = m_image_ctx.cct;
+  ldout(cct, 10) << this << " " << __func__ << ": "
+                 << "r=" << *result << dendl;
+
+  if (*result == 0) {
+    bufferlist::iterator it = m_out_bl.begin();
+    *result = cls_client::get_image_qos_finish(&it, &m_qos_pairs);
+  }
+
+  if (*result < 0 && *result != -EOPNOTSUPP && *result != -EIO) {
+    lderr(cct) << "couldn't list qos information: " << cpp_strerror(*result) << dendl;
+    return m_on_finish;
   }
 
   send_v2_get_flags();
@@ -1022,6 +1060,7 @@ void RefreshRequest<I>::apply() {
       m_image_ctx.flags = m_flags;
       m_image_ctx.group_spec = m_group_spec;
       m_image_ctx.parent_md = m_parent_md;
+      m_image_ctx.apply_qos(m_qos_pairs);
     }
 
     for (size_t i = 0; i < m_snapc.snaps.size(); ++i) {

@@ -214,6 +214,16 @@ struct C_InvalidateCache : public Context {
       this, "librbd::io_work_queue", cct->_conf->rbd_op_thread_timeout,
       thread_pool);
 
+
+    SafeTimer *timer;
+    Mutex *timer_lock;
+    get_timer_instance(cct, &timer, &timer_lock);
+
+    read_iops_throttle = new TokenBucketThrottle(cct, 0, 0,
+						 timer, timer_lock);
+    write_iops_throttle = new TokenBucketThrottle(cct, 0, 0,
+						  timer, timer_lock);
+
     if (cct->_conf->rbd_auto_exclusive_lock_until_manual_request) {
       exclusive_lock_policy = new exclusive_lock::AutomaticPolicy(this);
     } else {
@@ -255,6 +265,8 @@ struct C_InvalidateCache : public Context {
     delete io_work_queue;
     delete operations;
     delete state;
+    delete read_iops_throttle;
+    delete write_iops_throttle;
   }
 
   void ImageCtx::init() {
@@ -1057,6 +1069,39 @@ struct C_InvalidateCache : public Context {
     ASSIGN_OPTION(mirroring_resync_after_disconnect);
     ASSIGN_OPTION(mirroring_replay_delay);
     ASSIGN_OPTION(skip_partial_discard);
+  }
+
+
+  int ImageCtx::apply_qos(const std::map<std::string, uint64_t> &qos_pairs) {
+    ldout(cct, 20) << __func__ << dendl;
+
+    TokenBucketThrottle *qos_throttle;
+    for (auto it : qos_pairs) {
+      rbd_image_qos_type_t qos_type = get_qos_type(it.first);
+      rbd_image_qos_key_t qos_key = get_qos_key(it.first);
+
+      switch (qos_type) {
+	case RBD_IMAGE_QOS_TYPE_IOPS_READ:
+	  qos_throttle = read_iops_throttle;
+	  break;
+	case RBD_IMAGE_QOS_TYPE_IOPS_WRITE:
+	  qos_throttle = write_iops_throttle;
+	  break;
+	default:
+	  lderr(cct) << "We don't not supported type." << dendl;
+	  return -EINVAL;
+      }
+
+      // XXX we will support burst later.
+      if (qos_key == RBD_IMAGE_QOS_KEY_BURST) {
+	lderr(cct) << "We don't support Burst qos currently." << dendl;
+	return -EINVAL;
+      }
+      
+      qos_throttle->set_avg(it.second);
+      qos_throttle->set_max(it.second);
+    }
+    return 0;
   }
 
   ExclusiveLock<ImageCtx> *ImageCtx::create_exclusive_lock() {

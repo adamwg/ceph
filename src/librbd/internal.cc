@@ -2295,6 +2295,29 @@ int validate_pool(IoCtx &io_ctx, CephContext *cct) {
     return cls_client::metadata_list(&ictx->md_ctx, ictx->header_oid, start, max, pairs);
   }
 
+  int qos_get(ImageCtx *ictx, rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t *val)
+  {
+    std::string val_str;
+    int r = cls_client::metadata_get(&ictx->md_ctx, ictx->header_oid,
+				    get_qos_metadata_key(type, key), &val_str);
+    if (r == -EOPNOTSUPP) {
+      *val = UINT64_MAX;
+      r = 0;
+    } else if (r == 0) {
+      std::string error_message;
+      *val = strict_si_cast<uint64_t>(val_str.c_str(), &error_message);
+      if (!error_message.empty()) {
+	r = -EINVAL;
+      }
+    }
+    return r;
+  }
+
+  int qos_set(ImageCtx *ictx, rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t val)
+  {
+    return ictx->operations->qos_set(type, key, val);
+  }
+
   struct C_RBD_Readahead : public Context {
     ImageCtx *ictx;
     object_t oid;
@@ -2356,6 +2379,54 @@ int validate_pool(IoCtx &io_ctx, CephContext *cct) {
     }
   }
 
+  std::string qos_type_name(rbd_image_qos_type_t type) {
+    switch (type) {
+    case RBD_IMAGE_QOS_TYPE_IOPS_READ:
+      return "iops_read";
+    case RBD_IMAGE_QOS_TYPE_IOPS_WRITE:
+      return "iops_write";
+    case RBD_IMAGE_QOS_TYPE_IOPS_RW:
+      return "iops_rw";
+    default:
+      return "unknown (" + stringify(type) + ")";
+    }
+  }
 
+  std::string qos_key_name(rbd_image_qos_key_t key) {
+    switch (key) {
+    case RBD_IMAGE_QOS_KEY_AVG:
+      return "avg";
+    case RBD_IMAGE_QOS_KEY_BURST:
+      return "burst";
+    default:
+      return "unknown (" + stringify(key) + ")";
+    }
+  }
 
+  std::string get_qos_metadata_key(rbd_image_qos_type_t qos_type,
+				   rbd_image_qos_key_t qos_key) {
+    return (RBD_IMAGE_QOS_PREFIX + qos_type_name(qos_type) + "_" + qos_key_name(qos_key));
+  }
+
+  rbd_image_qos_type_t get_qos_type(std::string qos_name) {
+    if (qos_name.find("iops_read")) {
+      return RBD_IMAGE_QOS_TYPE_IOPS_READ;
+    } else if (qos_name.find("iops_write")) {
+      return RBD_IMAGE_QOS_TYPE_IOPS_WRITE;
+    } else if (qos_name.find("iops_rw")) {
+      return RBD_IMAGE_QOS_TYPE_IOPS_RW;
+    } else {
+      return RBD_IMAGE_QOS_TYPE_END;
+    }
+  }
+
+  rbd_image_qos_key_t get_qos_key(std::string qos_name) {
+    if (qos_name.find("avg")) {
+      return RBD_IMAGE_QOS_KEY_AVG;
+    } else if (qos_name.find("burst")) {
+      return RBD_IMAGE_QOS_KEY_BURST;
+    } else {
+      return RBD_IMAGE_QOS_KEY_END;
+    }
+  }
 }

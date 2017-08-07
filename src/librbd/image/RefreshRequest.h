@@ -127,6 +127,7 @@ private:
   uint64_t m_features;
   uint64_t m_incompatible_features;
   uint64_t m_flags;
+  map<string, uint64_t> m_qos_pairs;
   std::string m_object_prefix;
   ParentInfo m_parent_md;
   cls::rbd::GroupSpec m_group_spec;
@@ -162,6 +163,9 @@ private:
 
   void send_v2_get_mutable_metadata();
   Context *handle_v2_get_mutable_metadata(int *result);
+
+  void send_v2_get_qos();
+  Context *handle_v2_get_qos(int *result);
 
   void send_v2_get_flags();
   Context *handle_v2_get_flags(int *result);

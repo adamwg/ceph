@@ -197,6 +197,19 @@ typedef struct {
   time_t deferment_end_time;
 } rbd_trash_image_info_t;
 
+typedef enum {
+  RBD_IMAGE_QOS_TYPE_IOPS_READ		= 0,
+  RBD_IMAGE_QOS_TYPE_IOPS_WRITE		= 1,
+  RBD_IMAGE_QOS_TYPE_IOPS_RW		= 2,
+  RBD_IMAGE_QOS_TYPE_END		= 3
+} rbd_image_qos_type_t;
+
+typedef enum {
+  RBD_IMAGE_QOS_KEY_AVG		= 0,
+  RBD_IMAGE_QOS_KEY_BURST	= 1,
+  RBD_IMAGE_QOS_KEY_END		= 2
+} rbd_image_qos_key_t;
+
 CEPH_RBD_API void rbd_image_options_create(rbd_image_options_t* opts);
 CEPH_RBD_API void rbd_image_options_destroy(rbd_image_options_t opts);
 CEPH_RBD_API int rbd_image_options_set_string(rbd_image_options_t opts,

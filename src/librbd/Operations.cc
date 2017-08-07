@@ -21,6 +21,7 @@
 #include "librbd/operation/MetadataRemoveRequest.h"
 #include "librbd/operation/MetadataSetRequest.h"
 #include "librbd/operation/ObjectMapIterate.h"
+#include "librbd/operation/QosRequest.h"
 #include "librbd/operation/RebuildObjectMapRequest.h"
 #include "librbd/operation/RenameRequest.h"
 #include "librbd/operation/ResizeRequest.h"
@@ -1492,6 +1493,59 @@ int Operations<I>::prepare_image_update() {
   m_image_ctx.owner_lock.get_read();
 
   return r;
+}
+
+template <typename I>
+int Operations<I>::qos_set(rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t val) {
+  CephContext *cct = m_image_ctx.cct;
+  ldout(cct, 5) << this << " " << __func__ << ": type=" << type << ", key=" << key
+	        << ", value=" << val << dendl;
+
+  int r = m_image_ctx.state->refresh_if_required();
+  if (r < 0) {
+    return r;
+  }
+
+  if (m_image_ctx.read_only) {
+    return -EROFS;
+  }
+
+  {
+    RWLock::RLocker owner_lock(m_image_ctx.owner_lock);
+    C_SaferCond qos_ctx;
+
+    if (m_image_ctx.exclusive_lock != nullptr &&
+	!m_image_ctx.exclusive_lock->is_lock_owner()) {
+      C_SaferCond lock_ctx;
+
+      m_image_ctx.exclusive_lock->acquire_lock(&lock_ctx);
+      r = lock_ctx.wait();
+      if (r < 0) {
+	return r;
+      }
+    }
+
+    execute_qos_set(type, key, val, &qos_ctx);
+    r = qos_ctx.wait();
+  }
+
+  return r;
+}
+
+template <typename I>
+void Operations<I>::execute_qos_set(rbd_image_qos_type_t type,
+				    rbd_image_qos_key_t key,
+				    uint64_t val,
+				    Context *on_finish) {
+  assert(m_image_ctx.owner_lock.is_locked());
+
+  CephContext *cct = m_image_ctx.cct;
+  ldout(cct, 5) << this << " " << __func__ << ": type=" << type << ", key=" << key
+	        << ", value=" << val << dendl;
+
+  operation::QosRequest<I> *request =
+    new operation::QosRequest<I>(m_image_ctx, on_finish, type, key, val);
+  request->send();
 }
 
 template <typename I>

@@ -1262,6 +1262,34 @@ namespace librbd {
       return ioctx->operate(oid, &op);
     }
 
+    void get_image_qos_start(librados::ObjectReadOperation *op,
+			     const std::string &start, uint64_t max_return)
+    {
+      return metadata_list_start(op, start, max_return);
+    }
+
+    int get_image_qos_finish(bufferlist::iterator *it,
+			     std::map<std::string, uint64_t> *qos_pairs)
+    {
+      std::map<std::string, bufferlist> qos_pairs_str;
+      int r = metadata_list_finish(it, &qos_pairs_str);
+      if (r != 0)
+	return r;
+
+      std::string error_message;
+      for (std::map<std::string, bufferlist>::iterator it = qos_pairs_str.begin();
+	   it != qos_pairs_str.end(); ++it) {
+	std::string val_str(it->second.c_str(), it->second.length());
+	uint64_t val = strict_si_cast<uint64_t>(val_str.c_str(), &error_message);
+	if (!error_message.empty()) {
+	  return -EBADMSG;
+	}
+	(*qos_pairs)[it->first] = val;
+      }
+
+      return 0;
+    }
+
     int metadata_list(librados::IoCtx *ioctx, const std::string &oid,
                       const std::string &start, uint64_t max_return,
                       map<string, bufferlist> *pairs)

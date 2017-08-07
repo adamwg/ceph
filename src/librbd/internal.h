@@ -210,7 +210,17 @@ namespace librbd {
   int poll_io_events(ImageCtx *ictx, io::AioCompletion **comps, int numcomp);
   int metadata_list(ImageCtx *ictx, const string &last, uint64_t max, map<string, bufferlist> *pairs);
   int metadata_get(ImageCtx *ictx, const std::string &key, std::string *value);
+  int qos_get(ImageCtx *ictx, rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t *val);
+  int qos_set(ImageCtx *ictx, rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t val);
 
+  #define RBD_IMAGE_QOS_PREFIX "rbd_image_qos_"
+
+  std::string qos_type_name(rbd_image_qos_type_t type);
+  std::string qos_key_name(rbd_image_qos_key_t key);
+  std::string get_qos_metadata_key(rbd_image_qos_type_t qos_type,
+				   rbd_image_qos_key_t qos_key);
+  rbd_image_qos_type_t get_qos_type(std::string qos_name);
+  rbd_image_qos_key_t get_qos_key(std::string qos_name);
 }
 
 #endif

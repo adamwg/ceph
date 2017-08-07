@@ -218,6 +218,8 @@ void ImageRequestWQ<I>::aio_read(AioCompletion *c, uint64_t off, uint64_t len,
     return;
   }
 
+  m_image_ctx.read_iops_throttle->get(1);
+
   // if journaling is enabled -- we need to replay the journal because
   // it might contain an uncommitted write
   RWLock::RLocker owner_locker(m_image_ctx.owner_lock);
@@ -258,6 +260,8 @@ void ImageRequestWQ<I>::aio_write(AioCompletion *c, uint64_t off, uint64_t len,
   if (!start_in_flight_io(c)) {
     return;
   }
+
+  m_image_ctx.write_iops_throttle->get(1);
 
   RWLock::RLocker owner_locker(m_image_ctx.owner_lock);
   if (m_image_ctx.non_blocking_aio || writes_blocked()) {

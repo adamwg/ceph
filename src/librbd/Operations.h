@@ -6,7 +6,9 @@
 
 #include "cls/rbd/cls_rbd_types.h"
 #include "include/int_types.h"
+#include "include/rbd/librbd.h"
 #include "librbd/operation/ObjectMapIterate.h"
+#include "librbd/Types.h"
 #include <atomic>
 #include <string>
 #include <boost/function.hpp>
@@ -100,6 +102,10 @@ public:
 
   int metadata_remove(const std::string &key);
   void execute_metadata_remove(const std::string &key, Context *on_finish);
+
+  int qos_set(rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t val);
+  void execute_qos_set(rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t val,
+		       Context *on_finish);
 
   int prepare_image_update();
 

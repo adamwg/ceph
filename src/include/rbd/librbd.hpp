@@ -434,6 +434,9 @@ public:
   int metadata_get(const std::string &key, std::string *value);
   int metadata_set(const std::string &key, const std::string &value);
   int metadata_remove(const std::string &key);
+
+  int qos_set(rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t val);
+  int qos_get(rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t *val);
   /**
    * Returns a pair of key/value for this image
    */

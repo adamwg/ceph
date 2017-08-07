@@ -355,6 +355,31 @@ void MetadataRemoveEvent::dump(Formatter *f) const {
   f->dump_string("key", key);
 }
 
+void QosSetEvent::encode(bufferlist &bl) const {
+  OpEventBase::encode(bl);
+  ::encode(static_cast<uint8_t>(qos_type), bl);
+  ::encode(static_cast<uint8_t>(qos_key), bl);
+  ::encode(qos_val, bl);
+}
+
+void QosSetEvent::decode(__u8 version, bufferlist::iterator& it) {
+  OpEventBase::decode(version, it);
+  uint8_t int_qos_type;
+  uint8_t int_qos_key;
+  ::decode(int_qos_type, it);
+  ::decode(int_qos_key, it);
+  ::decode(qos_val, it);
+  qos_type =  static_cast<rbd_image_qos_type_t>(int_qos_type);
+  qos_key =  static_cast<rbd_image_qos_key_t>(int_qos_key);
+}
+
+void QosSetEvent::dump(Formatter *f) const {
+  OpEventBase::dump(f);
+  f->dump_unsigned("qos_type", qos_type);
+  f->dump_unsigned("qos_key", qos_key);
+  f->dump_unsigned("qos_val", qos_val);
+}
+
 void UnknownEvent::encode(bufferlist& bl) const {
   assert(false);
 }
@@ -440,6 +465,9 @@ void EventEntry::decode(bufferlist::iterator& it) {
     break;
   case EVENT_TYPE_AIO_COMPARE_AND_WRITE:
     event = AioCompareAndWriteEvent();
+    break;
+  case EVENT_TYPE_QOS_SET:
+    event = QosSetEvent();
     break;
   default:
     event = UnknownEvent();
@@ -792,6 +820,9 @@ std::ostream &operator<<(std::ostream &out, const EventType &type) {
     break;
   case EVENT_TYPE_AIO_COMPARE_AND_WRITE:
     out << "AioCompareAndWrite";
+    break;
+  case EVENT_TYPE_QOS_SET:
+    out << "QosSet";
     break;
   default:
     out << "Unknown (" << static_cast<uint32_t>(type) << ")";

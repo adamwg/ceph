@@ -1862,6 +1862,22 @@ namespace librbd {
     return r;
   }
 
+  int Image::qos_set(rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t val)
+  {
+    ImageCtx *ictx = (ImageCtx *)ctx;
+
+    int r = ictx->operations->qos_set(type, key, val);
+    return r;
+  }
+
+  int Image::qos_get(rbd_image_qos_type_t type, rbd_image_qos_key_t key, uint64_t *val)
+  {
+    ImageCtx *ictx = (ImageCtx *)ctx;
+
+    int r = librbd::qos_get(ictx, type, key, val);
+    return r;
+  }
+
   int Image::mirror_image_enable() {
     ImageCtx *ictx = (ImageCtx *)ctx;
     return librbd::api::Mirror<>::image_enable(ictx, false);
